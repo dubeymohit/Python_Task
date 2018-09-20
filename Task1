@@ -1,0 +1,15 @@
+import paramiko
+
+
+def sshcommand_machine1(hostname, port, username, password):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(hostname, port, username, password)
+    print("\nConnected with first machine")
+    stdin, stdout, stderr = client.exec_command("ls")
+    l = stdout.readlines()
+    print("\n".join(l))
+    client.close()
+
+if __name__ == "__main__":
+    sshcommand_machine1("IP", 22, "username", "password")
