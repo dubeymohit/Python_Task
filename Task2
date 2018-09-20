@@ -1,0 +1,114 @@
+# Mount the folder of server machine in client machine
+
+# Here: Machine1: Server: IP: 172.17.219.222
+#       Machine1: Client: IP: 172.17.219.55
+
+import paramiko
+from time import sleep
+
+
+class MountForlderOfRemoteMachine:
+
+    def __init__(self):
+        pass
+
+    def send_string_and_wait(self, command, shell):
+        # Send the su command
+        shell.send(command)
+
+        # Wait a bit, if necessary
+        sleep(1)
+
+        # Flush the receive buffer
+        receive_buffer = shell.recv(1024)
+
+    def send_string_and_wait_for_string(self, command, wait_string, shell):
+        # Send the su command
+        shell.send(command)
+
+        # Create a new receive buffer
+        receive_buffer = ""
+
+        while not wait_string in receive_buffer:
+            # Flush the receive buffer
+            receive_buffer += str(shell.recv(1024))
+
+    # SSH to remote machine
+    def sshToMachine(self, hostname, port, username, password):
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(hostname, port, username, password)
+        print("\nConnected with machine Successfully!")
+        return client
+
+    # Get root access of remote machine and run the commands
+    # This is SERVER Machine
+    def getRootAccessMachine1(self, system_su_password):
+
+        client = self.sshToMachine("172.17.219.222", 22, "mohit",
+                                  "test")
+        # Create a raw shell
+        shell = client.invoke_shell()
+
+        # Send the su command
+        self.send_string_and_wait("su -\n", shell)
+
+        # Send the client's su password followed by a newline
+        self.send_string_and_wait(system_su_password + "\n", shell)
+
+        # Create a folder inside var
+        root_command = "mkdir /var/my_folder\n"
+        self.send_string_and_wait_for_string(root_command, 'root', shell)
+
+        # Give access of that folder
+        root_command = "chown nobody:nogroup /var/my_folder\n"
+        self.send_string_and_wait_for_string(root_command, 'root', shell)
+
+        # append these access in /etc/exports file
+        root_command = "echo \"/var/my_folder 172.17.219.55(rw,sync, " \
+                       "no_subtree_check)\" >> /etc/exports\n"
+        self.send_string_and_wait_for_string(root_command, 'root', shell)
+
+        # Run exports command
+        root_command = "exportfs -a\n"
+        self.send_string_and_wait_for_string(root_command, 'root', shell)
+
+        # Start the NFS server
+        root_command = "service nfs-kernel-server start\n"
+        self.send_string_and_wait_for_string(root_command, 'root', shell)
+        return
+
+    # Get root access of remote machine and run the commands
+    # This is Client Machine
+    def getRootAccessMachine2(self, system_su_password):
+        client = self.sshToMachine("172.17.219.55", 22, "mohit",
+                                  "test")
+        # Create a raw shell
+        shell = client.invoke_shell()
+
+        # Send the su command
+        self.send_string_and_wait("su -\n", shell)
+
+        # Send the client's su password followed by a newline
+        self.send_string_and_wait(system_su_password + "\n", shell)
+
+        # Create a mount point
+        root_command = "mkdir -p /mnt/var/nfs/my_mount_point\n"
+        self.send_string_and_wait_for_string(root_command, 'root', shell)
+
+        # Mount the folder of server
+        root_command = "mount 172.17.219.222:/var/my_folder /mnt/var/nfs/my_mount_point\n"
+        self.send_string_and_wait_for_string(root_command, 'root', shell)
+
+        # Create a new file inside that mounted folder
+        root_command = "mkdir  /mnt/var/nfs/my_mount_point/my_file.txt\n"
+        self.send_string_and_wait_for_string(root_command, 'root', shell)
+        return
+
+
+if __name__ == "__main__":
+    obj = MountForlderOfRemoteMachine()
+    obj.getRootAccessMachine1("python")
+    obj.getRootAccessMachine2("python")
+
+
