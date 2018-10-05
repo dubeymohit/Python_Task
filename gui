@@ -1,0 +1,153 @@
+# First import tkinter module
+from tkinter import *
+from subprocess import Popen, PIPE, TimeoutExpired
+from select import *
+import time
+
+import threading
+
+import polling
+
+
+
+class Application3:
+
+    def __init__(self):
+        self.root = Tk()
+        self.frame = None
+        self.output = None
+        self.p = None
+
+    def start_t(self):
+        t = threading.Thread(None, self.run_script)
+        t.setDaemon(True)
+        t.start()
+
+    def run_script(self):
+        import main_script
+        self.output.delete(0.0, END)
+        out = 'testing'
+        self.output.insert(END, out)
+
+        process = Popen([sys.executable, "C:\\Users\\mohit.dubey\\GUI_task"
+                                              "\\main_script.py"],
+                             stderr=PIPE,
+                             stdout=PIPE
+                             )
+
+        while True:
+            line = process.stdout.readline()
+            p = process.poll()
+            if line == '' and p is not None:
+                break
+            self.output.insert(END, line.decode('utf-8'))
+
+        '''
+        #self.p = Popen([sys.executable, 'main_script.py'],
+                  #     stdout=PIPE, stderr=PIPE)
+        #self.p = Popen([sys.executable, "C:\\Users\\mohit.dubey\\GUI_task\\"
+                                        #"main_script.py"], stdout=PIPE,
+                                        #  stderr=PIPE)
+
+        self.p = Popen("python main_script.py", stdout=PIPE,
+                       stderr=PIPE)
+        try:
+            outs, errs = self.p.communicate(timeout=15)
+
+        except TimeoutExpired as ttimeo:
+            self.p.kill()
+            outs, errs = self.p.communicate()
+
+        print("Output is: ", self.p.stdout)
+
+        
+        y = polling.poll(None, None)
+        y.register(self.p.stdout, select.POLLIN)
+
+        while True:
+            if y.poll(1):
+                self.output.insert(END, self.p.stdout.readline())
+            else:
+                print("nothing here")
+                time.sleep(1)
+        '''
+
+        #(op, e) = self.p.communicate()
+        #print("Output is:  ",op)
+        #self.output.insert(END, stdout)
+
+        #print(self.output)
+
+    # Method for close the window and exit the program
+    def close_window(self):
+        # This condition true, is without starting of script, user exit it.
+        if self.p is None:
+            self.root.destroy()
+            exit()
+
+        else:
+            self.p.terminate()
+            self.root.destroy()
+            exit()
+
+    def create_text_box(self):
+        # Create a text box for output
+        self.output = Text(self.root, width=140, height=20, wrap=WORD,
+                           background="white")
+        self.output.place(x=40, y=200)
+
+        # Text box for key per minute
+        self.key_per_min = Text(self.root, width=30, height=2, wrap=WORD,
+                                background="#FF0")
+        self.key_per_min.place(x=550,  y=30)
+
+    def create_button(self):
+        # Create a label
+        self.label = Label(self.root, text="  Key per minute:   ", bg="#FF0",
+                           fg="black", font="none 18 bold")
+        self.label.place(x=300, y=30)
+
+        # Add a submit button
+        self.submit_button = Button(self.root, text="START", width=10,
+                                    command=self.start_t,
+                                    font="none 18 bold")
+        self.submit_button.place(x=250, y=80)
+
+        # Add a submit button
+        self.pause_button = Button(self.root, text="PAUSE", width=10,
+                                   command=None, font="none 18 bold")
+        self.pause_button.place(x=480, y=80)
+
+        # Add a submit button
+        self.open_file = Button(self.root, text="OPEN FILE", width=10,
+                                command=None, font="none 18 bold")
+        self.open_file.place(x=700, y=80)
+
+        # Add a submit button
+        self.exit_button = Button(self.root, text="EXIT", width=10,
+                                  command=self.close_window, font="none 18 bold")
+        self.exit_button.place(x=0, y=550)
+
+    def main(self):
+        # Set title, color, width*height and icon of Window
+        self.root.title("Bitcoin Application")
+        self.root.geometry("1200x600")
+        self.root.configure(background="blue")   # 33C1FF
+        icon = PhotoImage(file="C:\\Users\mohit.dubey\Desktop\Bitcoin.com_logo.png")
+        self.root.tk.call('wm', 'iconphoto', self.root._w, icon)
+
+        # Call the create_button method
+        self.create_button()
+
+        # Call the create_button method
+        self.create_text_box()
+
+        # Don't close the window until  user press cross button
+        self.root.mainloop()
+
+
+if __name__ == "__main__":
+    obj = Application3()
+    obj.main()
+
+
