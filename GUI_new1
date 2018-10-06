@@ -1,0 +1,222 @@
+# First import tkinter module
+from tkinter import *
+from subprocess import Popen, PIPE
+import time
+import threading
+
+
+class Application4:
+
+    def __init__(self):
+        self.root = Tk()
+        self.frame = None
+        self.output = None
+        self.p = None
+        self.flag = 0
+        self.process = None
+        self.first_start = True
+        self.open_csv_file()
+
+    def open_csv_file(self):
+        """ Open a CSV file """
+        file_name = "001"
+        file_name = file_name + ".csv"
+        file_name = "E:\\gui_application\\" + file_name
+        self.fh = open(file_name, "a+")
+
+    def read_csv_file(self):
+        print("Hello")
+        line = self.fh.readlines()
+        print(line)
+
+    def start_t(self):
+        self.t = threading.Thread(None, self.run_script)
+        self.t.setDaemon(True)
+        self.t.start()
+
+    def run_script(self):
+        # import main_script
+        self.output.delete(0.0, END)
+
+        self.process = Popen([sys.executable, "C:\\Users\\mohit.dubey\\GUI_task"
+                             "\\main_script.py"],
+                             stderr=PIPE,
+                             stdout=PIPE
+                             )
+        #self.process.poll()
+        self.read_the_lines()
+
+    def read_the_lines(self):
+        """ To read the CSV file """
+        
+        my_list = []
+
+        while True:
+            line = self.process.stdout.readline()
+            my_list.append(line)
+
+            # Write date in CSV file
+            self.fh.writelines(line.decode('utf-8'))
+            p = self.process.poll()
+
+            if line == '' and p is not None:
+                break
+
+            # Clean the text box after it has filled
+            if len(my_list) > 18 and self.flag != 1:
+                # Clean the text box
+                self.output.delete(0.0, END)
+
+                # Clean the my_list
+                my_list.clear()
+
+            if self.flag == 0:
+                self.output.insert(END, line.decode('utf-8'))
+
+    def start_button_logic(self):
+        """ Logic, of start button """
+
+        # Check start is called time or second time, if condition True
+        # then called method which create thread
+        if self.first_start:
+            self.first_start = False
+            self.start_t()
+
+        # Else, just start the printing on text box
+        else:
+            self.flag = 0
+            self.read_the_lines()
+
+    def pause_button_logic(self):
+        """ Logic, of pause button """
+
+        # Check script has started before pause it.
+        if self.first_start:
+            pass
+
+        # else, pause the output in text box
+        else:
+            self.flag = 1
+
+        '''
+        #self.p = Popen([sys.executable, 'main_script.py'],
+                  #     stdout=PIPE, stderr=PIPE)
+        #self.p = Popen([sys.executable, "C:\\Users\\mohit.dubey\\GUI_task\\"
+                                        #"main_script.py"], stdout=PIPE,
+                                        #  stderr=PIPE)
+
+        self.p = Popen("python main_script.py", stdout=PIPE,
+                       stderr=PIPE)
+        try:
+            outs, errs = self.p.communicate(timeout=15)
+
+        except TimeoutExpired as ttimeo:
+            self.p.kill()
+            outs, errs = self.p.communicate()
+
+        print("Output is: ", self.p.stdout)
+
+
+        y = polling.poll(None, None)
+        y.register(self.p.stdout, select.POLLIN)
+
+        while True:
+            if y.poll(1):
+                self.output.insert(END, self.p.stdout.readline())
+            else:
+                print("nothing here")
+                time.sleep(1)
+        '''
+
+        # (op, e) = self.p.communicate()
+        # print("Output is:  ",op)
+        # self.output.insert(END, stdout)
+
+        # print(self.output)
+
+    # Method for close the window and exit the program
+    def close_window(self):
+        """" Close the window and terminate the script """
+        # This condition true, is without starting of script, user exit it.
+        if self.p is None:
+            self.root.destroy()
+            exit()
+
+        else:
+            self.p.terminate()
+            self.root.destroy()
+            exit()
+
+    def create_text_box(self):
+        """ Create two text box: first for key per minute and
+        second for key data"""
+
+        # Create a text box for output
+        self.output = Text(self.root, width=140, height=20, wrap=WORD,
+                           background="white")
+        self.output.place(x=40, y=200)
+
+        # Text box for key per minute
+        self.key_per_min = Text(self.root, width=30, height=2, wrap=WORD,
+                                background="#FF0")
+        self.key_per_min.place(x=550, y=30)
+
+    def create_button(self):
+        """ Create 4 buttons: START, PAUSE, OPEN FILE AND EXIT """
+        # Create a label
+        self.label = Label(self.root, text="  Key per minute:   ", bg="#FF0",
+                           fg="black", font="none 18 bold")
+        self.label.place(x=300, y=30)
+
+        # Add a submit button
+        self.submit_button = Button(self.root, text="START", width=10,
+                                    command=self.start_button_logic,
+                                    font="none 18 bold")
+        self.submit_button.place(x=250, y=80)
+
+        # Add a submit button
+        self.pause_button = Button(self.root, text="PAUSE", width=10,
+                                   command=self.pause_button_logic,
+                                   font="none 18 bold")
+        self.pause_button.place(x=480, y=80)
+
+        # Add a submit button
+        self.open_file = Button(self.root, text="OPEN FILE", width=10,
+                                command=self.read_csv_file, font="none 18 bold")
+        self.open_file.place(x=700, y=80)
+
+        # Add a submit button
+        self.exit_button = Button(self.root, text="EXIT", width=10,
+                                  command=self.close_window,
+                                  font="none 18 bold")
+        self.exit_button.place(x=0, y=550)
+
+    def main(self):
+        """ Create and Open a GUI window """
+        # Set title, color, width*height and icon of Window
+        self.root.title("Bitcoin Application")
+        self.root.geometry("1200x600")
+        self.root.configure(background="blue")  # 33C1FF
+        icon = PhotoImage(
+            file="C:\\Users\mohit.dubey\Desktop\Bitcoin.com_logo.png")
+        self.root.tk.call('wm', 'iconphoto', self.root._w, icon)
+
+        # Call the create_button method
+        self.create_button()
+
+        # Call the create_button method
+        self.create_text_box()
+
+        # Don't close the window until  user press cross button
+        self.root.mainloop()
+
+    def __del__(self):
+        """ Close the CSV file """
+        self.fh.close()
+
+
+if __name__ == "__main__":
+    obj = Application4()
+    obj.main()
+
+
