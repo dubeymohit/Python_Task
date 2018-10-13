@@ -1,0 +1,574 @@
+# Import following modules
+from tkinter import *
+from subprocess import Popen, PIPE
+from threading import Thread
+from datetime import datetime
+from tkinter.scrolledtext import *
+from os import startfile, stat, getcwd
+import tkinter.messagebox
+
+
+class Application4:
+    """ Class to create a GUI application """
+    def __init__(self):
+        # Create a GUI window object
+        self.root = None
+        # output to show the output on text
+        self.output = None
+
+        # flag for pause check
+        self.flag = 0
+
+        # Thread object
+        self.process = None
+
+        # first_start to check start button is press first time or second time
+        self.first_start = True
+
+        # fh is file handler
+        self.fh = None
+
+        # Check file is empty or not
+        self.check_file_empty_or_not = None
+
+        # Count number of keys per minutes
+        self.key_per_min = 0
+
+        # if close the window then no seek(0):
+        self.do_not_call_seek = True
+
+    def open_csv_file(self):
+        """ Open a CSV file """
+
+        file_name = "001"
+
+        while True:
+            full_file_name = file_name + ".csv"
+
+            try:
+                self.fh = open(full_file_name, "a+", newline='')
+                # Check file is empty or not
+                self.check_file_empty_or_not = stat(full_file_name).st_size == 0
+
+                # This condition is only true is file is not empty
+                if not self.check_file_empty_or_not:
+                    self.fh.seek(0)
+                    file_data = self.fh.readlines()
+                    file_length = len(file_data)
+
+                    if file_length == 10:  # == 500
+                        file_name = int(file_name)
+                        file_name += 1
+
+                        # this name valid till 009
+                        if file_name < 10:
+                            file_name = str(file_name)
+                            file_name = "00" + file_name
+
+                        # this name is valid till 099
+                        elif file_name >= 10:
+                            file_name = str(file_name)
+                            file_name = "0" + file_name
+
+                        # this name is valid till 1
+                        elif file_name >= 99:
+                            file_name = str(file_name)
+
+                    else:
+                        break
+                else:
+                    self.fh.write("  Wallet Address,  Private Key    ,  "
+                                  "Private_key_to_WIF , Public key,  "
+                                  "Total received,  Balance, Date,  Time \n")
+
+                    # Address, Private key, WIF Private key, Public key,
+                    #  Total received, Balance, Date and Time Stamp
+                    break
+
+            except PermissionError as e:
+                self.first_start = True
+                error_message = str(e) + " file is open please close all " \
+                                         ".csv file and run the script again! "
+                tkinter.messagebox.showerror("Permission Error", error_message)
+                self.root.destroy()
+                exit()
+
+    def open_file(self):
+        """ Open the location of .csv file """
+        current_working_dir = getcwd()
+        startfile(current_working_dir)
+
+    def start_t(self):
+        """ To create a thread and run the method which run our second script"""
+        self.t = Thread(target=self.run_script, daemon=True)
+        # self.t.setDaemon(True)
+        self.t.start()
+
+    def run_script(self):
+        """ To run the second script """
+        self.output.delete(0.0, END)
+
+        if self.var1.get() == 0:
+            # filepath = Path(__file__).parent.absolute() / "ms.py"
+            # filepath = str(filepath)
+            # print(sys.executable + ' ' + filepath)
+            self.process = Popen([sys.executable, '-u', "main_script.py"],
+                                 stderr=PIPE,
+                                 stdout=PIPE,
+                                 )
+
+            self.write_date_in_file_and_in_text_box_for_api()
+
+        else:
+            # filepath = Path(__file__).parent.absolute()
+            #  / "main_script_without_balance.py"
+            # filepath = str(filepath)
+
+            self.process = Popen([sys.executable, '-u', "main_script_without_"
+                                                        "api.py"],
+                                 stderr=PIPE,
+                                 stdout=PIPE
+                                 )
+
+            self.write_date_in_file_and_in_text_box_for_without_api()
+
+    def write_date_in_file_and_in_text_box_for_without_api(self):
+        """ To write data in file and in text box """
+        key_per_min = 0
+        current_time = datetime.now()
+
+        while True:
+            line = self.process.stdout.readline()
+
+            if line == '' and self.process.poll() is not None:
+                break
+
+            # Convert byte to string
+            string = line.decode('utf-8')
+
+            if string.startswith("HTTP") or string.startswith("Retrying"):
+
+                # if process is pause then don't print data in text_box
+                if self.flag == 1:
+                    continue
+
+                # Insert the data in text box
+                if self.flag == 0:
+                    self.output.insert(END, string)
+
+                # Pushes the scrollbar and focus of text to the end of
+                # the text input.
+                self.output.yview(END)
+
+            else:
+                # Logic for key per minutes
+                key_per_min += 1
+
+                delta = datetime.now() - current_time
+
+                # print(f"Time: {delta.seconds}, Keys:{key_per_min} ,
+                # Lines:{line}")
+                if delta.seconds >= 60:  # == 60 seconds
+                    label2 = Label(self.root, text=key_per_min, bg="#FF0",
+                                   fg="black", font="none 18 bold",
+                                   width=15,
+                                   height=1)
+                    label2.place(x=600, y=30)
+
+                    current_time = datetime.now()
+                    key_per_min = 0
+
+                # If main thread want to close the application then child thread
+                # should not call seek(0) method
+
+                if self.do_not_call_seek:
+                    self.fh.seek(0)
+                    file_data = self.fh.readlines()
+                    file_length = len(file_data)
+
+                    # Logic for create new .csv file
+                    if file_length == 10:  # == 500
+                        self.open_csv_file()
+
+                    else:
+                        # Current position of file
+                        self.fh.seek(0, 2)
+
+                        if len(string) <= 2:
+                            pass
+
+                        elif len(string) > 2:
+                            string = string.split(":")
+                            time = string[4] + ':' + string[5] + ':' + string[6]
+                            date = string[3].split("-")
+                            date = date[2] + ':' + date[1] + ':' + date[0]
+
+                            string_for_csv_file = string[0] + ',' + string[1] +\
+                                                  ',' + string[2] + ',' + ' - '\
+                                                    + ' - ,' + \
+                                                   date + ',' + time
+
+                            # Address, Private key, WIF Private key, Public key,
+                            #  Total received, Balance, Date and Time Stamp
+
+                            # Write date in CSV file
+                            # print(string_for_csv_file)
+                            self.fh.write(string_for_csv_file)
+
+                    # if process is pause then don't print data in text_box
+                    if self.flag == 1:
+                        continue
+
+                    # Insert the data in text box
+                    if self.flag == 0:
+                        string = string[0] + '\n'
+                        self.output.insert(END, string)
+
+                    # Pushes the scrollbar and focus of text to the end of
+                    # the text input.
+                    self.output.yview(END)
+
+                else:
+                    break
+
+    def write_date_in_file_and_in_text_box_for_api(self):
+        """ To write data in file and in text box """
+        key_per_min = 0
+        current_time = datetime.now()
+
+        while True:
+            line = self.process.stdout.readline()
+
+            if line == '' and self.process.poll() is not None:
+                break
+
+            # Convert byte to string
+            string = line.decode('utf-8')
+
+            if string.startswith("HTTP") or string.startswith("Retrying"):
+
+                # if process is pause then don't print data in text_box
+                if self.flag == 1:
+                    continue
+
+                # Insert the data in text box
+                if self.flag == 0:
+                    self.output.insert(END, string)
+
+                # Pushes the scrollbar and focus of text to the end of
+                # the text input.
+                self.output.yview(END)
+
+            else:
+                # Logic for key per minutes
+                key_per_min += 1
+
+                delta = datetime.now() - current_time
+
+                # print(f"Time: {delta.seconds}, Keys:{key_per_min} ,
+                # Lines:{line}")
+                if delta.seconds >= 60:  # == 60 seconds
+                    label2 = Label(self.root, text=key_per_min, bg="#FF0",
+                                   fg="black", font="none 18 bold",
+                                   width=15,
+                                   height=1)
+                    label2.place(x=600, y=30)
+
+                    current_time = datetime.now()
+                    key_per_min = 0
+
+                # If main thread want to close the application then child thread
+                # should not call seek(0) method
+
+                if self.do_not_call_seek:
+                    self.fh.seek(0)
+                    file_data = self.fh.readlines()
+                    file_length = len(file_data)
+
+                    # Logic for create new .csv file
+                    if file_length == 10:   # == 500
+                        self.open_csv_file()
+
+                    else:
+                        # Current position of file
+                        self.fh.seek(0, 2)
+
+                        if len(string) <= 2:
+                            pass
+
+                        elif len(string) > 2:
+                            string = string.split(":")
+                            time = string[6] + ':' + string[7] + ':' + string[8]
+                            date = string[5].split("-")
+                            date = date[2] + ':' + date[1] + ':' + date[0]
+
+                            string_for_csv_file = string[0] + ',' + string[1] + ','\
+                                     + string[2] + ',' + string[3] + ',' + \
+                                     "- ," + string[4] + ',' + date + ',' + time
+
+                            # Address, Private key, WIF Private key, Public key,
+                            #  Total received, Balance, Date and Time Stamp
+
+                            # Write date in CSV file
+                            # print(string_for_csv_file)
+                            self.fh.write(string_for_csv_file)
+
+                    # if process is pause then don't print data in text_box
+                    if self.flag == 1:
+                        continue
+
+                    # Insert the data in text box
+                    if self.flag == 0:
+                        string = string[0] + " : " + string[4] + '\n'
+                        self.output.insert(END, string)
+
+                    # Pushes the scrollbar and focus of text to the end of
+                    # the text input.
+                    self.output.yview(END)
+
+                else:
+                    break
+
+                '''
+                else:
+                    try:
+                        self.process.terminate()
+                        self.root.destroy()
+                        exit()
+
+                    except RuntimeError:
+                        exit()
+
+                    except SystemExit:
+                        exit()
+                '''
+
+
+    def start_button_logic(self):
+        """ Logic, of start button """
+
+        # Check start is called time or second time, if condition True
+        # then called method which create thread
+        if self.first_start:
+            self.first_start = False
+
+            # Add a start button
+            start_button = Button(self.root, text="START", width=10,
+                                  command=self.start_button_logic,
+                                  font="none 18 bold",
+                                  state='disabled', bg='green', fg='black')
+            start_button.place(x=250, y=80)  # 250, 80
+            # start_button.bind("<Enter>", self.on_enter1)
+
+            # Creare CSV file
+            self.open_csv_file()
+
+            # To create a thread and  call run_script method to run
+            # the second script
+            self.start_t()
+
+        # Else, just start the printing on text box
+        else:
+            # Add a start button
+            start_button = Button(self.root, text="START", width=10,
+                                  command=self.start_button_logic,
+                                  font="none 18 bold",
+                                  state='disabled', bg='green', fg='black')
+            start_button.place(x=250, y=80)  # 250, 80
+
+            # Add a pause button
+            pause_button = Button(self.root, text="PAUSE", width=10,
+                                  command=self.pause_button_logic,
+                                  font="none 18 bold")
+            pause_button.place(x=480, y=80)
+
+        self.flag = 0
+
+    def pause_button_logic(self):
+        """ Logic, of pause button """
+
+        # Check script has started before pause it.
+        if self.first_start:
+            pass
+
+        # else, pause the output in text box
+        else:
+            # Add a start button
+            start_button = Button(self.root, text="START", width=10,
+                                  command=self.start_button_logic,
+                                  font="none 18 bold",
+                                  state='normal')
+            start_button.place(x=250, y=80)  # 250, 80
+
+            # Add a pause button
+            pause_button = Button(self.root, text="PAUSE", width=10,
+                                  command=self.pause_button_logic,
+                                  font="none 18 bold", bg='yellow',
+                                  fg='black'
+                                  )
+            pause_button.place(x=480, y=80)
+            # self.pause_button.bind("<Enter>", self.on_enter_pause)
+
+            # self.start_button.bind("<Enter>", self.on_enter1)
+            self.flag = 1
+
+    def close_window(self):
+        """" Close the window and terminate the script """
+        # This condition true, is without starting of script, user exit it.
+
+        message_window = tkinter.messagebox.askyesno("Warning", "Are you sure "
+                                                     "you want to close the "
+                                                     "window! ")
+        if message_window:
+            self.do_not_call_seek = False
+
+            if self.process is None:
+               self.root.destroy()
+
+            else:
+                self.process.terminate()
+                self.root.destroy()
+
+                if not self.first_start:
+                    self.fh.close()
+
+
+        else:
+            pass
+
+    def create_text_box(self):
+        """ Create two text box: first for key per minute and
+        second for key data"""
+
+        # Create a text box for output
+        self.output = ScrolledText(self.root, width=135, height=20, wrap=WORD,
+                                   background="white")
+        self.output.place(x=40, y=200)
+
+    def __callback(self):
+        """ Handle the X icon of the window """
+
+        # First give a warning to the user
+        message_window = tkinter.messagebox.askyesno("Warning", "Are you sure "
+                                                     "you want to close the "
+                                                     "window! ")
+        if message_window:
+            self.do_not_call_seek = False
+
+            if self.first_start:
+                # Quit before start then just destroy the window
+                self.root.destroy()
+
+            else:
+                # First close the file
+                self.fh.close()
+                self.root.destroy()
+
+        else:
+            pass
+
+    def on_enter_start(self, e):
+        self.start_button['background'] = 'green'
+
+    def on_enter_pause(self, e):
+        self.pause_button['background'] = 'yellow'
+
+    def on_enter_open_file(self, e):
+        self.open_file['background'] = 'green'
+
+    def on_leave_start(self, e):
+        self.start_button['background'] = 'SystemButtonFace'
+
+    def on_leave_pause(self, e):
+        self.pause_button['background'] = 'SystemButtonFace'
+
+    def on_leave_open_file(self, e):
+        self.open_file['background'] = 'SystemButtonFace'
+
+    def create_button(self):
+        """ Create 4 buttons: START, PAUSE, OPEN FILE AND EXIT """
+
+        # Create a label to display Keys/minute
+        label1 = Label(self.root, text="  Keys/minute:   ", bg="#FF0",
+                       fg="black", font="none 18 bold", width=15, height=1)
+        label1.place(x=300, y=30)
+
+        # Label to display number of keys per minute
+        label2 = Label(self.root, text=0, bg="#FF0",
+                       fg="black", font="none 18 bold", width=15, height=1)
+        label2.place(x=600, y=30)
+
+        # Add a start button
+        # photo = PhotoImage(file="start_image4.png")
+        self.start_button = Button(self.root, text="START",
+                                   width=10, command=self.start_button_logic,
+                                   font="none 18 bold",
+                                   state='normal')
+        self.start_button.place(x=250, y=80)        # 250, 80
+
+        self.start_button.bind("<Enter>", self.on_enter_start)
+        self.start_button.bind("<Leave>", self.on_leave_start)
+
+        # Add a pause button
+        self.pause_button = Button(self.root, text="PAUSE", width=10,
+                                   command=self.pause_button_logic,
+                                   font="none 18 bold")
+        self.pause_button.place(x=480, y=80)   # 480, 80
+        self.pause_button.bind("<Enter>", self.on_enter_pause)
+        self.pause_button.bind("<Leave>", self.on_leave_pause)
+
+        # Add a open_file button
+        # photo = PhotoImage(file="open_file1.png")  image=photo
+        self.open_file = Button(self.root, text="OPEN FILE",
+                                width=10, command=self.open_file,
+                                font="none 18 bold")
+        self.open_file.place(x=700, y=80)    # 700, 80
+        self.open_file.bind("<Enter>", self.on_enter_open_file)
+        self.open_file.bind("<Leave>", self.on_leave_open_file)
+
+        # Add a exit button
+        exit_button = Button(self.root, text="EXIT", width=10,
+                             command=self.close_window,
+                             font="none 18 bold")
+        exit_button.place(x=0, y=550)  # 0, 550
+
+        # Add a Check Button
+        self.var1 = IntVar()
+
+        check_button = Checkbutton(self.root, variable=self.var1)
+        check_button.place(x=40, y=170)   # 800, 80
+
+        # Label for with API or without API
+        with_api_or_without_api = Label(self.root, text="On for without API",
+                                        bg='#D3D3D3', fg="black",
+                                        font="none 18 bold", width=15, height=1)
+        with_api_or_without_api.place(x=75, y=165)
+
+        # Handle CROSS ICON of window
+        self.root.protocol("WM_DELETE_WINDOW", self.__callback)
+
+    def main(self):
+        """ Create and Open a GUI window """
+        # Set title, color, width*height and icon of Window
+        self.root = Tk()
+        self.root.title("Bitcoin Application")
+        self.root.geometry("1200x600")
+        self.root.configure(background="#D3D3D3")  # 33C1FF
+        icon = PhotoImage(file="Bitcoin.com_logo.png")
+        self.root.tk.call('wm', 'iconphoto', self.root._w, icon)
+
+        # Call the create_button method
+        self.create_button()
+
+        # Call the create_button method
+        self.create_text_box()
+
+        # Don't close the window until  user press cross button
+        self.root.mainloop()
+
+
+if __name__ == "__main__":
+    obj = Application4()
+    obj.main()
+
+
